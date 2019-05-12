@@ -9,6 +9,17 @@
       fields::Dict
    end # struct
 
+   struct GenericFuntion
+      name :: Symbol
+      parameters :: Tuple
+      specific :: Dict
+   end
+
+   struct SpecificMethod
+      parent
+      types
+      native_function
+   end
 
    function make_class(name,super,fields)
       realFields = tuple(fields...)
@@ -82,3 +93,47 @@ end
 
 set_slot!(c11,:a,3)
 get_slot(c11,:a)
+
+
+macro defgeneric(expr)
+   let name = expr.args[1],
+      sym = Meta.parse(":$name")
+      parameters = tuple(expr.args[2:end]...)
+      meths = Dict{Tuple,SpecificMethod}()
+      :($(esc(name)) = GenericFuntion($(sym),$(parameters),$meths) )
+   end
+end
+
+@defgeneric Foo(x)
+
+macro defmethod(expr)
+
+   let name = expr.args[1].args[1],
+      parameters = tuple(expr.args[1].args[2:end]...)
+      dump(parameters)
+      :($(name).specific[(Int,)] = SpecificMethod($(name),(Int,),(x)->x*x) )
+
+   end
+end
+
+
+@defmethod Foo(x::Int) = x*x
+
+
+function doGenericMethod(method :: GenericFuntion , args...)
+   temp = tuple()
+   for arg in args
+      temp = (temp...,typeof(arg))
+   end
+   if haskey(method.specific,temp)
+      return method.specific[temp].native_function(args...)
+   else
+      error("No aplicable method")
+   end
+end
+
+doGenericMethod(Foo,2)
+
+(f::GenericFuntion)(args...) = doGenericMethod(f,args...)
+
+Foo(2)
