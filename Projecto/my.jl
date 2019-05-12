@@ -29,7 +29,8 @@
          realFields = (realFields...,getfield(sp,:fields)...)
 
       end
-      return Class(name,tuple(super...),realFields)
+
+      return Class(name,realParents,realFields)
    end
 
    C1 = make_class(:C1,[],[:a])
