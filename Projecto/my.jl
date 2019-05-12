@@ -22,8 +22,10 @@
    end
 
    function make_class(name,super,fields)
+      realParents = tuple(name)
       realFields = tuple(fields...)
       for sp in super
+         realParents = (realParents...,getfield(sp,:hierarchy)...)
          realFields = (realFields...,getfield(sp,:fields)...)
 
       end
