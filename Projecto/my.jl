@@ -11,7 +11,8 @@
 
    struct GenericFuntion
       name :: Symbol
-      parameters :: Tuple
+      parameters
+      num::Int
       specific :: Dict
    end
 
@@ -74,7 +75,7 @@ function Base.setproperty!(obj::Instance, sym::Symbol,x)
 end
 
 macro defclass(name,super,fields...)
-   sym = Meta.parse(":$name")
+   sym = Expr(:quote,name)
    realFields=[:($(Symbol(entry))) for entry in fields]
 
    :($(esc(name)) = make_class($(sym),$super,$realFields))
@@ -100,43 +101,81 @@ get_slot(c11,:a)
 
 macro defgeneric(expr)
    let name = expr.args[1],
-      sym = Meta.parse(":$name")
-      parameters = tuple(expr.args[2:end]...)
+      sym = Expr(:quote,name)
+      parameters = (expr.args[2:end])
       meths = Dict{Tuple,SpecificMethod}()
-      :($(esc(name)) = GenericFuntion($(sym),$(parameters),$meths) )
+      :($(esc(name)) = GenericFuntion($(sym),$(parameters),size($parameters,1),$meths) )
    end
 end
 
-@defgeneric Foo(x)
+@defgeneric Foo(y)
 
 macro defmethod(expr)
-
+   param_type = tuple()
+   param_var = tuple()
    let name = expr.args[1].args[1],
-      parameters = tuple(expr.args[1].args[2:end]...)
-      dump(parameters)
-      :($(name).specific[(Int,)] = SpecificMethod($(name),(Int,),(x)->x*x) )
+      parameters = (expr.args[1].args[2:end]),
+      body =expr.args[2].args[2],
+      current = 1
+      quote
 
+         if size($(parameters),1) !== $(name).num
+            error("Wrong number of args")
+         end
+         for i = 1:$(name).num
+            if $(parameters)[i].args[1] !== $(name).parameters[i]
+               error("Wrong number of args")
+            end
+            $(param_type = tuple(param_type...,parameters[current].args[2]))
+            $(param_var = tuple(param_var...,parameters[current].args[1]))
+            $(current = current +1)
+         end
+         $(name).specific[$(param_type)] = SpecificMethod($(name),$(param_type), $(Expr(:tuple,param_var...))-> $(body))
+      end
    end
 end
 
 
-@defmethod Foo(x::Int) = x*x
-
+@defmethod Foo(y::C1) = y.a+y.a
 
 function doGenericMethod(method :: GenericFuntion , args...)
-   temp = tuple()
+   temp = []
    for arg in args
-      temp = (temp...,typeof(arg))
+      temp = push!(temp,getfield(arg,:class))
    end
-   if haskey(method.specific,temp)
-      return method.specific[temp].native_function(args...)
+
+   metd = lookSpecificMethod(1,method.specific,temp)
+   if metd !== missing
+      return metd.native_function(args...)
    else
       error("No aplicable method")
    end
 end
 
-doGenericMethod(Foo,2)
+
+
+doGenericMethod(Foo,c11)
 
 (f::GenericFuntion)(args...) = doGenericMethod(f,args...)
+c12.a = 2
+c21 = make_instance(C2, :a => 2)
+Foo(c21)
 
-Foo(2)
+#Function responsible for looking for the best suited specific method
+function lookSpecificMethod(i :: Int, dic :: Dict,args)
+   for arg in args[i].hierarchy
+      if i === size(args,1)
+         args[end] = arg
+         if haskey(dic,tuple(args...))
+            return dic[tuple(args...)]
+         end
+      else
+         args[i] = arg
+         temp = lookSpecificMethod(i+1, dic,args)
+         if temp !== missing
+            return temp
+         end
+      end
+   end
+   return missing
+end
