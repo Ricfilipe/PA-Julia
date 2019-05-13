@@ -22,6 +22,10 @@
       native_function
    end
 
+#Tranlator for primitives
+   const Translator = Dict{Symbol,Any}()
+   Translator[:Int] = Symbol(Int)
+
    function make_class(name,super,fields)
       realParents = tuple(name)
       realFields = tuple(fields...)
@@ -110,15 +114,17 @@ end
 
 @defgeneric Foo(y)
 
+
+
 macro defmethod(expr)
    param_type = tuple()
    param_var = tuple()
+   param = :C1
    let name = expr.args[1].args[1],
       parameters = (expr.args[1].args[2:end]),
       body =expr.args[2].args[2],
       current = 1
       quote
-
          if size($(parameters),1) !== $(name).num
             error("Wrong number of args")
          end
@@ -126,7 +132,7 @@ macro defmethod(expr)
             if $(parameters)[i].args[1] !== $(name).parameters[i]
                error("Wrong number of args")
             end
-            $(param_type = tuple(param_type...,parameters[current].args[2]))
+            $(param_type = tuple(param_type...,get(Translator,parameters[current].args[2],parameters[current].args[2])))
             $(param_var = tuple(param_var...,parameters[current].args[1]))
             $(current = current +1)
          end
@@ -137,11 +143,19 @@ end
 
 
 @defmethod Foo(y::C1) = y.a+y.a
+@defmethod Foo(y::Any) = y+y
 
 function doGenericMethod(method :: GenericFuntion , args...)
    temp = []
    for arg in args
-      temp = push!(temp,getfield(arg,:class))
+
+      if typeof(arg) === Instance
+         dump(getfield(arg,:class))
+         temp = push!(temp,getfield(arg,:class))
+      else
+         temp = push!(temp,(typeof(arg)))
+      end
+
    end
 
    metd = lookSpecificMethod(1,method.specific,temp)
@@ -152,25 +166,52 @@ function doGenericMethod(method :: GenericFuntion , args...)
    end
 end
 
-
-
-doGenericMethod(Foo,c11)
-
-(f::GenericFuntion)(args...) = doGenericMethod(f,args...)
-c12.a = 2
-c21 = make_instance(C2, :a => 2)
-Foo(c21)
-
 #Function responsible for looking for the best suited specific method
 function lookSpecificMethod(i :: Int, dic :: Dict,args)
-   for arg in args[i].hierarchy
+   arg = Any
+   if typeof(args[i])==Class
+      for arg in args[i].hierarchy
+         if i === size(args,1)
+            args[end] = arg
+            if haskey(dic,tuple(args...))
+               return dic[tuple(args...)]
+            end
+         else
+            args[i] = arg
+            temp = lookSpecificMethod(i+1, dic,args)
+            if temp !== missing
+               return temp
+            end
+         end
+      end
+      return missing
+   else
+      arg = args[i]
+      while arg !== Any
+         if i === size(args,1)
+            args[end] = Symbol(arg)
+            if haskey(dic,tuple(args...))
+               return dic[tuple(args...)]
+            end
+         else
+            args[i] = Symbol(arg)
+            temp = lookSpecificMethod(i+1, dic,args)
+            if temp !== missing
+               return temp
+            end
+         end
+         arg = arg.super
+      end
+   end
+
+   if arg === Any
       if i === size(args,1)
-         args[end] = arg
+         args[end] = Symbol(arg)
          if haskey(dic,tuple(args...))
             return dic[tuple(args...)]
          end
       else
-         args[i] = arg
+         args[i] = Symbol(arg)
          temp = lookSpecificMethod(i+1, dic,args)
          if temp !== missing
             return temp
@@ -178,4 +219,14 @@ function lookSpecificMethod(i :: Int, dic :: Dict,args)
       end
    end
    return missing
+
 end
+
+
+doGenericMethod(Foo,c11)
+doGenericMethod(Foo,1)
+
+(f::GenericFuntion)(args...) = doGenericMethod(f,args...)
+c12.a = 2
+c21 = make_instance(C2, :a => 2)
+Foo(c21)
