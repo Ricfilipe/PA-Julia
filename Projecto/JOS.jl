@@ -38,34 +38,39 @@
       return Class(name,realParents,realFields)
    end
 
+function Symbol(arg::Class)
+   return arg.name
+end
+
+
    C1 = make_class(:C1,[],[:a])
 
    function make_instance(class,init...)
       dic = Dict{Symbol,Any}()
+
       for f in class.fields
          dic[f] = nothing
-   end
+      end
 
+   inst = Instance(class,dic)
    for p in init
-      dic[p.first] = p.second
+      set_slot!(inst,p.first,p.second)
    end
 
-   return Instance(class,dic)
+   return inst
 end
 
-c11 = make_instance(C1,:a => 1)
-c12 = make_instance(C1)
 
 function Base.getproperty(obj::Instance, sym::Symbol)
    dic = getfield(obj,:fields)
    if haskey(dic,sym)
       slot = get(dic,sym,nothing)
       if slot === nothing
-         error("Slot $sym is missing")
+         error("Slot $sym is unbound")
       end
       return slot
    else
-      error("Slot $sym is unbound")
+      error("Slot $sym is missing")
    end
 end
 
@@ -74,7 +79,7 @@ function Base.setproperty!(obj::Instance, sym::Symbol,x)
    if haskey(dic,sym)
       return dic[sym] = x
    else
-      error("Slot $sym is unbound")
+      error("Slot $sym is missing")
    end
 end
 
@@ -86,21 +91,19 @@ macro defclass(name,super,fields...)
 end
 
 
-@defclass(C2,[C1],c)
 
 
 function get_slot(obj::Instance,sym::Symbol)
    return getproperty(obj, sym)
 end
 
-get_slot(c11,:a)
+
 
 function set_slot!(obj::Instance,sym::Symbol,value)
    return setproperty!(obj, sym,value)
 end
 
-set_slot!(c11,:a,3)
-get_slot(c11,:a)
+
 
 
 macro defgeneric(expr)
@@ -112,45 +115,54 @@ macro defgeneric(expr)
    end
 end
 
-@defgeneric Foo(y)
+function incrementvariable(numb)
+     numb[1] += 1
+ end
+
+ function getinc(numb)
+      return numb[1]
+  end
 
 
 
 macro defmethod(expr)
-   param_type = tuple()
-   param_var = tuple()
+   param_type = []
+   param_var = []
    param = :C1
    let name = expr.args[1].args[1],
       parameters = (expr.args[1].args[2:end]),
       body =expr.args[2].args[2],
-      current = 1
-      quote
-         if size($(parameters),1) !== $(name).num
-            error("Wrong number of args")
+      current = [1]
+      i=1
+
+         for i = 1:size(parameters,1)
+            push!((param_type),get(Translator,Symbol((parameters[i].args[2])),Symbol((parameters[i].args[2]))))
+            push!((param_var),get(Translator,Symbol((parameters[i].args[1])),Symbol((parameters[i].args[1]))))
          end
-         for i = 1:$(name).num
-            if $(parameters)[i].args[1] !== $(name).parameters[i]
+         
+         param_var = tuple(param_var...)
+         quote
+            if size(($parameters),1) !== $(name).num
                error("Wrong number of args")
             end
-            $(param_type = tuple(param_type...,get(Translator,parameters[current].args[2],parameters[current].args[2])))
-            $(param_var = tuple(param_var...,parameters[current].args[1]))
-            $(current = current +1)
-         end
-         $(name).specific[$(param_type)] = SpecificMethod($(name),$(param_type), $(Expr(:tuple,param_var...))-> $(body))
+
+
+         $(name).specific[tuple($(param_type)...)] = SpecificMethod($(name),$(param_type), $(Expr(:tuple,param_var...))-> $(body))
       end
    end
 end
 
 
-@defmethod Foo(y::C1) = y.a+y.a
-@defmethod Foo(y::Any) = y+y
+
+
+
 
 function doGenericMethod(method :: GenericFuntion , args...)
    temp = []
    for arg in args
 
       if typeof(arg) === Instance
-         dump(getfield(arg,:class))
+
          temp = push!(temp,getfield(arg,:class))
       else
          temp = push!(temp,(typeof(arg)))
@@ -159,12 +171,15 @@ function doGenericMethod(method :: GenericFuntion , args...)
    end
 
    metd = lookSpecificMethod(1,method.specific,temp)
+
    if metd !== missing
       return metd.native_function(args...)
    else
-      error("No aplicable method")
+      error("No applicable method")
    end
 end
+
+
 
 #Function responsible for looking for the best suited specific method
 function lookSpecificMethod(i :: Int, dic :: Dict,args)
@@ -223,10 +238,4 @@ function lookSpecificMethod(i :: Int, dic :: Dict,args)
 end
 
 
-doGenericMethod(Foo,c11)
-doGenericMethod(Foo,1)
-
 (f::GenericFuntion)(args...) = doGenericMethod(f,args...)
-c12.a = 2
-c21 = make_instance(C2, :a => 2)
-Foo(c21)
