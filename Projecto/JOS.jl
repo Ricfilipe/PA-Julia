@@ -168,7 +168,6 @@ function doGenericMethod(method :: GenericFuntion , args...)
       else
          temp = push!(temp,(typeof(arg)))
       end
-
    end
 
    metd = lookSpecificMethod(1,method.specific,temp)
@@ -242,12 +241,22 @@ end
 (f::GenericFuntion)(args...) = doGenericMethod(f,args...)
 
 
-
+#Main Project Tests
 # C1 = make_class(:C1,[],[:a])
 # @defclass(C2,[C1],a)
 # @defclass(C3,[C1,C2],b)
 # c11 = make_instance(C1,:a=>3)
-# 
+# c31 = make_instance(C3,:a=>2)
+# set_slot!(c11,:a,3)
+# get_slot(c11,:a)
+# c31.b = 3
+# c31.b
+# @defgeneric Foo(y)
+# @defmethod Foo(x::C2) = x.a
+# Foo(c31)
+
+
+#Extension Tests
 # @defgeneric Bar(x)
 # @defmethod Bar(x::Int) = x*x
 # @defmethod Bar(x::Dict) = x[:a]
