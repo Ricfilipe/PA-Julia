@@ -241,7 +241,7 @@ end
 (f::GenericFuntion)(args...) = doGenericMethod(f,args...)
 
 
-#Main Project Tests
+#Main Project Example
 # C1 = make_class(:C1,[],[:a])
 # @defclass(C2,[C1],a)
 # @defclass(C3,[C1,C2],b)
@@ -256,14 +256,20 @@ end
 # Foo(c31)
 
 
-#Extension Tests
+#Extension Example
+#-------------------------------------------------------------
+# Added capability to support primitive types, all their super
+# types (including Any) and Dictionaries.
+# Important: its only supported Dictionaries: Any => Any
+#--------------------------------------------------------------
 # @defgeneric Bar(x)
 # @defmethod Bar(x::Int) = x*x
 #@defmethod Bar(s :: String) = print(s)
 # @defmethod Bar(x::Dict) = x[:a]
-#
+#@defmethod Bar(x::Any)= dump(x)
 # dicionario = Dict{Any,Any}()
 # dicionario[:a]= "teste"
 #Bar("Hello")
 # Bar(2)
 # Bar(dicionario)
+#Bar(:s)
