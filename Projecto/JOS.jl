@@ -259,9 +259,11 @@ end
 #Extension Tests
 # @defgeneric Bar(x)
 # @defmethod Bar(x::Int) = x*x
+#@defmethod Bar(s :: String) = print(s)
 # @defmethod Bar(x::Dict) = x[:a]
 #
 # dicionario = Dict{Any,Any}()
 # dicionario[:a]= "teste"
+#Bar("Hello")
 # Bar(2)
 # Bar(dicionario)
