@@ -25,14 +25,23 @@
 #Tranlator for primitives
    const Translator = Dict{Symbol,Any}()
    Translator[:Int] = Symbol(Int)
+   Translator[:Dict] = Symbol(Dict{Any,Any})
+   Translator[:Tuple] = Symbol(Tuple{Any})
 
    function make_class(name,super,fields)
       realParents = tuple(name)
       realFields = tuple(fields...)
       for sp in super
-         realParents = (realParents...,getfield(sp,:hierarchy)...)
-         realFields = (realFields...,getfield(sp,:fields)...)
-
+         for pare in getfield(sp,:hierarchy)
+            if !(pare in realParents)
+               realParents = (realParents...,pare)
+            end
+         end
+         for field in getfield(sp,:fields)
+            if !(field in realFields)
+               realFields = (realFields...,field)
+            end
+         end
       end
 
       return Class(name,realParents,realFields)
@@ -43,7 +52,6 @@ function Symbol(arg::Class)
 end
 
 
-   C1 = make_class(:C1,[],[:a])
 
    function make_instance(class,init...)
       dic = Dict{Symbol,Any}()
@@ -86,7 +94,6 @@ end
 macro defclass(name,super,fields...)
    sym = Expr(:quote,name)
    realFields=[:($(Symbol(entry))) for entry in fields]
-
    :($(esc(name)) = make_class($(sym),$super,$realFields))
 end
 
@@ -126,27 +133,21 @@ function incrementvariable(numb)
 
 
 macro defmethod(expr)
-   param_type = []
-   param_var = []
-   param = :C1
+
    let name = expr.args[1].args[1],
       parameters = (expr.args[1].args[2:end]),
       body =expr.args[2].args[2],
-      current = [1]
-      i=1
-
+      param_type = [],
+      param_var = []
          for i = 1:size(parameters,1)
             push!((param_type),get(Translator,Symbol((parameters[i].args[2])),Symbol((parameters[i].args[2]))))
-            push!((param_var),get(Translator,Symbol((parameters[i].args[1])),Symbol((parameters[i].args[1]))))
+            push!((param_var),Symbol((parameters[i].args[1])))
          end
-         
          param_var = tuple(param_var...)
          quote
             if size(($parameters),1) !== $(name).num
                error("Wrong number of args")
             end
-
-
          $(name).specific[tuple($(param_type)...)] = SpecificMethod($(name),$(param_type), $(Expr(:tuple,param_var...))-> $(body))
       end
    end
@@ -239,3 +240,19 @@ end
 
 
 (f::GenericFuntion)(args...) = doGenericMethod(f,args...)
+
+
+
+# C1 = make_class(:C1,[],[:a])
+# @defclass(C2,[C1],a)
+# @defclass(C3,[C1,C2],b)
+# c11 = make_instance(C1,:a=>3)
+# 
+# @defgeneric Bar(x)
+# @defmethod Bar(x::Int) = x*x
+# @defmethod Bar(x::Dict) = x[:a]
+#
+# dicionario = Dict{Any,Any}()
+# dicionario[:a]= "teste"
+# Bar(2)
+# Bar(dicionario)
