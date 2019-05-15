@@ -1,73 +1,65 @@
-   struct Class
-      name :: Symbol
-      hierarchy
-      fields:: Tuple
-   end # struct
+struct Class
+   name :: Symbol
+   hierarchy
+   fields:: Tuple
+end # struct
 
-   struct Instance
-      class::Class
-      fields::Dict
-   end # struct
+struct Instance
+   class::Class
+   fields::Dict
+end # struct
 
-   struct GenericFuntion
-      name :: Symbol
-      parameters
-      num::Int
-      specific :: Dict
-   end
+struct GenericFuntion
+   name :: Symbol
+   parameters
+   num::Int
+   specific :: Dict
+end # struct
 
-   struct SpecificMethod
-      parent
-      types
-      native_function
-   end
+struct SpecificMethod
+   parent
+   types
+   native_function
+end # struct
 
 #Tranlator for primitives
-   const Translator = Dict{Symbol,Any}()
-   Translator[:Int] = Symbol(Int)
-   Translator[:Dict] = Symbol(Dict{Any,Any})
-   Translator[:Tuple] = Symbol(Tuple{Any})
+const Translator = Dict{Symbol,Any}()
+Translator[:Int] = Symbol(Int)
+Translator[:Dict] = Symbol(Dict{Any,Any})
 
-   function make_class(name,super,fields)
-      realParents = tuple(name)
-      realFields = tuple(fields...)
-      for sp in super
-         for pare in getfield(sp,:hierarchy)
-            if !(pare in realParents)
-               realParents = (realParents...,pare)
-            end
-         end
-         for field in getfield(sp,:fields)
-            if !(field in realFields)
-               realFields = (realFields...,field)
-            end
+function make_class(name,super,fields)
+   realParents = tuple(name)
+   realFields = tuple(fields...)
+   for sp in super
+      for pare in getfield(sp,:hierarchy)
+         if !(pare in realParents)
+            realParents = (realParents...,pare)
          end
       end
-
-      return Class(name,realParents,realFields)
+      for field in getfield(sp,:fields)
+         if !(field in realFields)
+            realFields = (realFields...,field)
+         end
+      end
    end
+   return Class(name,realParents,realFields)
+end
 
 function Symbol(arg::Class)
    return arg.name
 end
 
-
-
-   function make_instance(class,init...)
-      dic = Dict{Symbol,Any}()
-
-      for f in class.fields
-         dic[f] = nothing
-      end
-
+function make_instance(class,init...)
+   dic = Dict{Symbol,Any}()
+   for f in class.fields
+      dic[f] = nothing
+   end
    inst = Instance(class,dic)
    for p in init
       set_slot!(inst,p.first,p.second)
    end
-
    return inst
 end
-
 
 function Base.getproperty(obj::Instance, sym::Symbol)
    dic = getfield(obj,:fields)
@@ -97,21 +89,13 @@ macro defclass(name,super,fields...)
    :($(esc(name)) = make_class($(sym),$super,$realFields))
 end
 
-
-
-
 function get_slot(obj::Instance,sym::Symbol)
    return getproperty(obj, sym)
 end
 
-
-
 function set_slot!(obj::Instance,sym::Symbol,value)
    return setproperty!(obj, sym,value)
 end
-
-
-
 
 macro defgeneric(expr)
    let name = expr.args[1],
@@ -122,18 +106,7 @@ macro defgeneric(expr)
    end
 end
 
-function incrementvariable(numb)
-     numb[1] += 1
- end
-
- function getinc(numb)
-      return numb[1]
-  end
-
-
-
 macro defmethod(expr)
-
    let name = expr.args[1].args[1],
       parameters = (expr.args[1].args[2:end]),
       body =expr.args[2].args[2],
@@ -152,11 +125,6 @@ macro defmethod(expr)
       end
    end
 end
-
-
-
-
-
 
 function doGenericMethod(method :: GenericFuntion , args...)
    temp = []
@@ -178,8 +146,6 @@ function doGenericMethod(method :: GenericFuntion , args...)
       error("No applicable method")
    end
 end
-
-
 
 #Function responsible for looking for the best suited specific method
 function lookSpecificMethod(i :: Int, dic :: Dict,args)
@@ -234,12 +200,9 @@ function lookSpecificMethod(i :: Int, dic :: Dict,args)
       end
    end
    return missing
-
 end
 
-
 (f::GenericFuntion)(args...) = doGenericMethod(f,args...)
-
 
 #Main Project Example
 # C1 = make_class(:C1,[],[:a])
@@ -255,7 +218,6 @@ end
 # @defmethod Foo(x::C2) = x.a
 # Foo(c31)
 
-
 #Extension Example
 #-------------------------------------------------------------
 # Added capability to support primitive types, all their super
@@ -264,12 +226,12 @@ end
 #--------------------------------------------------------------
 # @defgeneric Bar(x)
 # @defmethod Bar(x::Int) = x*x
-#@defmethod Bar(s :: String) = print(s)
+# @defmethod Bar(s :: String) = "I am type String!"
 # @defmethod Bar(x::Dict) = x[:a]
-#@defmethod Bar(x::Any)= dump(x)
+# @defmethod Bar(x::Any)= "I am type Any!"
 # dicionario = Dict{Any,Any}()
 # dicionario[:a]= "teste"
-#Bar("Hello")
+# Bar("Hello")
 # Bar(2)
 # Bar(dicionario)
-#Bar(:s)
+# Bar(:s)
